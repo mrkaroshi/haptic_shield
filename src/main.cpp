@@ -1,7 +1,12 @@
 #include <Arduino.h>
 
 void setup() {
-    // put your setup code here, to run once:
+    // setup the enable pins
+
+    // setup the PWM ports
+
+    // initialise the I2C port to communicate with the mux
+    
 }
 
 void loop() {
