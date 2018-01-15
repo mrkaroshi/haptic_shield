@@ -1,3 +1,10 @@
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_DRV2605.h>
+
+extern "C" {
+#include "utility/twi.h"  // from Wire library, so we can do bus scanning
+}
 #include "main.hpp"
 
 int LEAVE_STANDBY = 6;
@@ -19,15 +26,13 @@ int MOT8_EN = 48;
 int MOT1_PWM = 2;
 
 
-int mux_address_mot1 = 0x70;
-int drv_address_mot1 = 0x5A; // 0xB4 8-bit for writing
-
-Adafruit_DRV2605 drv1;
+int MUX_ADDRESS_MOT1 = 0x70;
+int DRV_ADDRESS_MOT1 = 0x5A; // 0xB4 8-bit for writing
 
 void tcaselect(uint8_t i) {
   if (i > 7) return;
 
-  Wire.beginTransmission(mux_address_mot1);
+  Wire.beginTransmission(MUX_ADDRESS_MOT1);
   Wire.write(1 << i);
   Wire.endTransmission();
 }
@@ -88,6 +93,48 @@ uint8_t writeDRV(uint8_t mux_address, uint8_t drv_address, uint8_t register_add,
 
 }
 
+void initDRV(uint8_t mux_address, uint8_t drv_address){
+
+  uint8_t config = 0x00;
+
+  while(config != 0xE0){ // wait for OC condition to clear
+    config = readDRV(mux_address, drv_address, DRV2605_REG_STATUS, 1);
+  }
+  // out of standby
+  uint8_t val = writeDRV(mux_address, drv_address, DRV2605_REG_MODE, 0x00);
+  // disable RTP
+  val = writeDRV(mux_address, drv_address, DRV2605_REG_RTPIN, 0x00);
+  // strong click type
+  val = writeDRV(mux_address, drv_address, DRV2605_REG_WAVESEQ1, 1);
+  val = writeDRV(mux_address, drv_address, DRV2605_REG_WAVESEQ2, 0);
+  // no overdrive
+  val = writeDRV(mux_address, drv_address, DRV2605_REG_OVERDRIVE, 0);
+
+  val = writeDRV(mux_address, drv_address, DRV2605_REG_SUSTAINPOS, 0);
+  val = writeDRV(mux_address, drv_address, DRV2605_REG_SUSTAINNEG, 0);
+  val = writeDRV(mux_address, drv_address, DRV2605_REG_BREAK, 0);
+  val = writeDRV(mux_address, drv_address, DRV2605_REG_AUDIOMAX, 0x64);
+
+}
+
+void selectLib(uint8_t mux_address, uint8_t drv_address, uint8_t lib){
+
+  writeDRV(mux_address, drv_address, DRV2605_REG_LIBRARY, lib);
+
+}
+
+void setMode(uint8_t mux_address, uint8_t drv_address, uint8_t mode){
+
+  writeDRV(mux_address, drv_address, DRV2605_REG_MODE, mode);
+
+}
+
+// void setWaveform(uint8_t ){
+//
+//   writeDRV(mux_address, drv_address, DRV2605_REG_MODE, mode);
+//
+// } FINISH WRITING!
+
 void setup() {
 
     Serial.begin(9600);
@@ -102,22 +149,14 @@ void setup() {
 
 void loop() {
 
-  uint8_t config = 0x00;
+  initDRV(MUX_ADDRESS_MOT1, DRV_ADDRESS_MOT1);
+  selectLib(MUX_ADDRESS_MOT1, DRV_ADDRESS_MOT1, 1);
+  setMode(MUX_ADDRESS_MOT1, DRV_ADDRESS_MOT1, DRV2605_MODE_INTTRIG);
+  // setwaveform
 
-  while(config != 0xE0){
-    config = readDRV(mux_address_mot1, drv_address_mot1, DRV2605_REG_STATUS, 1);
-  }
-
+  // go effect
 
     while(1){
-
-      delay(1000);
-
-      Serial.println(config, HEX);
-
-      if(success == 1){
-        Serial.println("Success!");
-      }
 
     }
 }
