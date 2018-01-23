@@ -24,6 +24,7 @@ int MOT8_EN = 48;
 // serial
 #define INPUT_SIZE 20
 int new_data = 0;
+bool debug_mode = false;
 
 // functions
 void tcaselect(uint8_t i) {
@@ -146,7 +147,7 @@ void runDiagnostics(){
 
 void setup() {
 
-  Serial.begin(115200);
+  Serial.begin(230400);
   Serial.println("Haptic Shield v0.1b");
 
   //initDRV();
@@ -197,16 +198,28 @@ void loop() {
     // split command into a, b and c
     char* RTP_mode = strchr(command, 'r'); // returns pointer to location of instance
     char* INTTRIG_mode = strchr(command, 'i'); // returns pointer to location of instance
+    char* DEBUG_mode = strchr(command, 'd'); // returns pointer to location of instance
     char* ENABLE_selection = strchr(command, 'e'); // returns pointer to location of instance
     char* TRIGGER_selection = strchr(command, 't'); // returns pointer to location of instance
 
     // pick mode
+    if (DEBUG_mode != 0){
+      *DEBUG_mode = 0;
+      ++DEBUG_mode;
+      debug_mode = !debug_mode;
+      if(debug_mode){
+        Serial.print("DRV ");
+      }
+    }
+
     if (ENABLE_selection != 0){
       *ENABLE_selection = 0;
       ++ENABLE_selection;
       int enableSelection = atoi(ENABLE_selection);
       tcaselect(enableSelection);
-      Serial.print("DRV selected: "); Serial.println(enableSelection, DEC);
+      if(debug_mode){
+        Serial.print("DRV selected: "); Serial.println(enableSelection, DEC);
+      }
       new_data = 1;
     }
 
@@ -214,10 +227,12 @@ void loop() {
       *TRIGGER_selection = 0;
       ++TRIGGER_selection;
       int TRIGGER_DRV = atoi(TRIGGER_selection);
-      tcaselect(TRIGGER_DRV);
-      drv.setMode(DRV2605_MODE_INTTRIG);
+      //tcaselect(TRIGGER_DRV);
+      //drv.setMode(DRV2605_MODE_INTTRIG);
       drv.go();
-      Serial.print("DRV triggered: "); Serial.println(TRIGGER_DRV, DEC);
+      if(debug_mode){
+        Serial.print("DRV triggered: "); Serial.println(TRIGGER_DRV, DEC);
+      }
       new_data = 1;
     }
 
@@ -226,7 +241,9 @@ void loop() {
       ++RTP_mode;
       int RTP_val = atoi(RTP_mode);
       enableRTP(RTP_val);
-      Serial.print("DRV RTP: "); Serial.println(RTP_val, DEC);
+      if(debug_mode){
+        Serial.print("DRV RTP: "); Serial.println(RTP_val, DEC);
+      }
       new_data = 1;
     }
 
@@ -235,7 +252,9 @@ void loop() {
       ++INTTRIG_mode;
       int INTTRIG_val = atoi(INTTRIG_mode);
       enableRTP(INTTRIG_val);
-      Serial.print("DRV "); Serial.println(INTTRIG_val, DEC); Serial.println(" set to INTTRIG.");
+      if(debug_mode){
+        Serial.print("DRV "); Serial.println(INTTRIG_val, DEC); Serial.println(" set to INTTRIG.");
+      }
       new_data = 1;
     }
 
