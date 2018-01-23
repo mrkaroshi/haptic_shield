@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include "Adafruit_DRV2605.h"
+#include <Chrono.h>
 
 Adafruit_DRV2605 drv;
 
@@ -145,6 +146,9 @@ void runDiagnostics(){
 
 // Audio-to-vibe
 
+// software timers
+Chrono chronoi2c(Chrono::MICROS);
+
 void setup() {
 
   Serial.begin(230400);
@@ -188,77 +192,84 @@ void loop() {
   // choose between RTP or INTTRIG
 
   // wait for incoming command
-  char input[INPUT_SIZE + 1]; // create array for incoming serial data of set size
-  byte size = Serial.readBytes(input, INPUT_SIZE); // read in input
-  input[size] = 0; // clear array after read
-  char* command = strtok(input, " "); // returns pointer to beginning of token
+  if(Serial.available()){
+    char input[INPUT_SIZE + 1]; // create array for incoming serial data of set size
+    byte size = Serial.readBytes(input, INPUT_SIZE); // read in input
+    input[size] = 0; // clear array after read
+    char* command = strtok(input, " "); // returns pointer to beginning of token
 
-  while (command != 0){
+    while (command != 0){
+      chronoi2c.restart(0);
+      // split command into a, b and c
+      char* RTP_mode = strchr(command, 'r'); // returns pointer to location of instance
+      char* INTTRIG_mode = strchr(command, 'i'); // returns pointer to location of instance
+      char* DEBUG_mode = strchr(command, 'd'); // returns pointer to location of instance
+      char* ENABLE_selection = strchr(command, 'e'); // returns pointer to location of instance
+      char* TRIGGER_selection = strchr(command, 't'); // returns pointer to location of instance
 
-    // split command into a, b and c
-    char* RTP_mode = strchr(command, 'r'); // returns pointer to location of instance
-    char* INTTRIG_mode = strchr(command, 'i'); // returns pointer to location of instance
-    char* DEBUG_mode = strchr(command, 'd'); // returns pointer to location of instance
-    char* ENABLE_selection = strchr(command, 'e'); // returns pointer to location of instance
-    char* TRIGGER_selection = strchr(command, 't'); // returns pointer to location of instance
-
-    // pick mode
-    if (DEBUG_mode != 0){
-      *DEBUG_mode = 0;
-      ++DEBUG_mode;
-      debug_mode = !debug_mode;
-      if(debug_mode){
-        Serial.print("DRV ");
+      // pick mode
+      if (DEBUG_mode != 0){
+        *DEBUG_mode = 0;
+        ++DEBUG_mode;
+        debug_mode = !debug_mode;
+        if(debug_mode){
+          Serial.print("Debug mode!");
+        }
       }
-    }
 
-    if (ENABLE_selection != 0){
-      *ENABLE_selection = 0;
-      ++ENABLE_selection;
-      int enableSelection = atoi(ENABLE_selection);
-      tcaselect(enableSelection);
-      if(debug_mode){
-        Serial.print("DRV selected: "); Serial.println(enableSelection, DEC);
+      if (ENABLE_selection != 0){
+        *ENABLE_selection = 0;
+        ++ENABLE_selection;
+        int enableSelection = atoi(ENABLE_selection);
+        tcaselect(enableSelection);
+        if(debug_mode){
+          Serial.print("DRV selected: "); Serial.println(enableSelection, DEC);
+        }
+        new_data = 1;
       }
-      new_data = 1;
-    }
 
-    if (TRIGGER_selection != 0){
-      *TRIGGER_selection = 0;
-      ++TRIGGER_selection;
-      int TRIGGER_DRV = atoi(TRIGGER_selection);
-      //tcaselect(TRIGGER_DRV);
-      //drv.setMode(DRV2605_MODE_INTTRIG);
-      drv.go();
-      if(debug_mode){
-        Serial.print("DRV triggered: "); Serial.println(TRIGGER_DRV, DEC);
+
+
+      if (TRIGGER_selection != 0){
+        *TRIGGER_selection = 0;
+        ++TRIGGER_selection;
+        int TRIGGER_DRV = atoi(TRIGGER_selection);
+        //tcaselect(TRIGGER_DRV);
+        //drv.setMode(DRV2605_MODE_INTTRIG);
+        drv.go();
+        if(debug_mode){
+          Serial.print("DRV triggered: "); Serial.println(TRIGGER_DRV, DEC);
+        }
+        new_data = 1;
       }
-      new_data = 1;
-    }
 
-    if (RTP_mode != 0){
-      *RTP_mode = 0;
-      ++RTP_mode;
-      int RTP_val = atoi(RTP_mode);
-      enableRTP(RTP_val);
-      if(debug_mode){
-        Serial.print("DRV RTP: "); Serial.println(RTP_val, DEC);
+      chronoi2c.stop();
+      Serial.println(chronoi2c.elapsed());
+
+      if (RTP_mode != 0){
+        *RTP_mode = 0;
+        ++RTP_mode;
+        int RTP_val = atoi(RTP_mode);
+        enableRTP(RTP_val);
+        if(debug_mode){
+          Serial.print("DRV RTP: "); Serial.println(RTP_val, DEC);
+        }
+        new_data = 1;
       }
-      new_data = 1;
-    }
 
-    if (INTTRIG_mode != 0){
-      *INTTRIG_mode = 0;
-      ++INTTRIG_mode;
-      int INTTRIG_val = atoi(INTTRIG_mode);
-      enableRTP(INTTRIG_val);
-      if(debug_mode){
-        Serial.print("DRV "); Serial.println(INTTRIG_val, DEC); Serial.println(" set to INTTRIG.");
+      if (INTTRIG_mode != 0){
+        *INTTRIG_mode = 0;
+        ++INTTRIG_mode;
+        int INTTRIG_val = atoi(INTTRIG_mode);
+        enableRTP(INTTRIG_val);
+        if(debug_mode){
+          Serial.print("DRV "); Serial.println(INTTRIG_val, DEC); Serial.println(" set to INTTRIG.");
+        }
+        new_data = 1;
       }
-      new_data = 1;
-    }
 
-    command = strtok(0, " "); // split command based on the space
+      command = strtok(0, " "); // split command based on the space
+    }
   }
 
   if(new_data){
