@@ -22,6 +22,9 @@ int MOT6_EN = 44;
 int MOT7_EN = 46;
 int MOT8_EN = 48;
 
+// vibe
+int previous_waveform = 16;
+
 // serial
 #define INPUT_SIZE 4
 int new_data = 0;
@@ -47,7 +50,7 @@ void tcaclear() {
 
 void tcaenableall() {
 
-  uint8_t transmission = 8; // BE CAREFUL!
+  uint8_t transmission = 255; // BE CAREFUL!
   Wire.beginTransmission(TCAADDR);
   Wire.write(transmission);
   Wire.endTransmission(true);
@@ -65,6 +68,7 @@ void setOutputs(){
 
 void enableDRV(uint8_t bit_pattern){
 
+
   digitalWrite(MOT1_EN, (bit_pattern & B00000001));
   digitalWrite(MOT2_EN, (bit_pattern & B00000010) >> 1);
   digitalWrite(MOT3_EN, (bit_pattern & B00000100) >> 2); // driver 3
@@ -79,7 +83,7 @@ void enableDRV(uint8_t bit_pattern){
 void initDRV(){
 
   setOutputs();
-  enableDRV(0xFF);
+  enableDRV(255);
   Wire.begin();
   delay(250);
   tcaclear();
@@ -89,15 +93,21 @@ void initDRV(){
   drv.selectLibrary(6);
   drv.setMode(DRV2605_MODE_INTTRIG);
   drv.useERM();
+  //enableDRV(0);
 
 }
 
 // MENU
 
 // RTP
-void enableRTP(uint8_t vibe_val){
+void enableRTP(){
 
   drv.setMode(DRV2605_MODE_REALTIME);
+
+}
+
+void sendRTP(uint8_t vibe_val){
+
   drv.setRealtimeValue(vibe_val);
 
 }
@@ -154,24 +164,7 @@ void setup() {
   Serial.begin(9600);
   Serial.println("Haptic Shield v0.1b");
 
-  //initDRV();
-  pinMode(MOT1_EN, OUTPUT); // MOT1 enable
-  pinMode(MOT2_EN, OUTPUT); // MOT1 enable
-  pinMode(MOT3_EN, OUTPUT); // MOT1 enable
-  pinMode(MOT4_EN, OUTPUT); // MOT1 enable
-  pinMode(MOT5_EN, OUTPUT); // MOT1 enable
-  pinMode(MOT6_EN, OUTPUT); // MOT1 enable
-  pinMode(MOT7_EN, OUTPUT); // MOT1 enable
-  pinMode(MOT8_EN, OUTPUT); // MOT1 enable
-  digitalWrite(MOT1_EN, HIGH); // driver 1
-  digitalWrite(MOT2_EN, LOW);
-  digitalWrite(MOT3_EN, HIGH); // driver 3
-  digitalWrite(MOT4_EN, HIGH); // driver 4
-  digitalWrite(MOT5_EN, LOW);
-  digitalWrite(MOT6_EN, LOW);
-  digitalWrite(MOT7_EN, LOW);
-  digitalWrite(MOT8_EN, LOW);
-
+  initDRV();
   Wire.begin();
   delay(250);
   tcaclear();
@@ -181,7 +174,7 @@ void setup() {
   drv.selectLibrary(6);
   drv.setMode(DRV2605_MODE_INTTRIG);
   drv.useERM();
-  drv.setWaveform(0, 4);  // play effect
+  drv.setWaveform(0, previous_waveform);  // play effect
   drv.setWaveform(1, 0);       // end waveform
 }
 
@@ -194,17 +187,15 @@ void loop() {
   // wait for incoming command
   if(Serial.available()){
     char input[INPUT_SIZE + 1]; // create array for incoming serial data of set size
-    //chronoi2c.restart(0);
     byte size = Serial.readBytes(input, INPUT_SIZE); // read in input
     input[size] = 0; // clear array after read
     char* command = strtok(input, " "); // returns pointer to beginning of token
-    //chronoi2c.stop();
-    //Serial.println(chronoi2c.elapsed());
 
     while (command != 0){
       // split command into a, b and c
-      char* RTP_mode = strchr(command, 'r'); // returns pointer to location of instance
+      char* RTP_transmit = strchr(command, 'r'); // returns pointer to location of instance
       char* INTTRIG_mode = strchr(command, 'i'); // returns pointer to location of instance
+      char* RTP_mode = strchr(command, 'p'); // returns pointer to location of instance
       char* DEBUG_mode = strchr(command, 'd'); // returns pointer to location of instance
       char* ENABLE_selection = strchr(command, 'e'); // returns pointer to location of instance
       char* TRIGGER_selection = strchr(command, 't'); // returns pointer to location of instance
@@ -215,7 +206,7 @@ void loop() {
         ++DEBUG_mode;
         debug_mode = !debug_mode;
         if(debug_mode){
-          Serial.print("Debug mode!");
+          Serial.println("Debug mode!");
         }
       }
 
@@ -249,7 +240,18 @@ void loop() {
         *RTP_mode = 0;
         ++RTP_mode;
         int RTP_val = atoi(RTP_mode);
-        enableRTP(RTP_val);
+        enableRTP();
+        if(debug_mode){
+          Serial.println("RTP mode enabled.");
+        }
+        new_data = 1;
+      }
+
+      if (RTP_transmit != 0){
+        *RTP_transmit = 0;
+        ++RTP_transmit;
+        int RTP_val = atoi(RTP_transmit);
+        sendRTP(RTP_val);
         if(debug_mode){
           Serial.print("DRV RTP: "); Serial.println(RTP_val, DEC);
         }
@@ -259,12 +261,18 @@ void loop() {
       if (INTTRIG_mode != 0){
         *INTTRIG_mode = 0;
         ++INTTRIG_mode;
-        int INTTRIG_val = atoi(INTTRIG_mode);
-        enableRTP(INTTRIG_val);
+        int INTTRIG_val = atoi(INTTRIG_mode); // not used yet
+        if(INTTRIG_val == 0){
+          INTTRIG_val = previous_waveform; // if no value entered, default
+        }
+        drv.setMode(DRV2605_MODE_INTTRIG);
+        drv.setWaveform(0, INTTRIG_val);  // play effect
+        drv.setWaveform(1, 0);       // end waveform
         if(debug_mode){
-          Serial.print("DRV "); Serial.println(INTTRIG_val, DEC); Serial.println(" set to INTTRIG.");
+          Serial.print("Waveform trigger "); Serial.print(INTTRIG_val, DEC); Serial.println(" set on current DRV.");
         }
         new_data = 1;
+        previous_waveform = INTTRIG_val;
       }
 
       command = strtok(0, " "); // split command based on the space
