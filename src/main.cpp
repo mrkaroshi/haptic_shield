@@ -23,7 +23,7 @@ int MOT7_EN = 46;
 int MOT8_EN = 48;
 
 // serial
-#define INPUT_SIZE 20
+#define INPUT_SIZE 4
 int new_data = 0;
 bool debug_mode = false;
 
@@ -147,11 +147,11 @@ void runDiagnostics(){
 // Audio-to-vibe
 
 // software timers
-Chrono chronoi2c(Chrono::MICROS);
+//Chrono chronoi2c(Chrono::MICROS);
 
 void setup() {
 
-  Serial.begin(230400);
+  Serial.begin(9600);
   Serial.println("Haptic Shield v0.1b");
 
   //initDRV();
@@ -181,7 +181,7 @@ void setup() {
   drv.selectLibrary(6);
   drv.setMode(DRV2605_MODE_INTTRIG);
   drv.useERM();
-  drv.setWaveform(0, 17);  // play effect
+  drv.setWaveform(0, 4);  // play effect
   drv.setWaveform(1, 0);       // end waveform
 }
 
@@ -194,12 +194,14 @@ void loop() {
   // wait for incoming command
   if(Serial.available()){
     char input[INPUT_SIZE + 1]; // create array for incoming serial data of set size
+    //chronoi2c.restart(0);
     byte size = Serial.readBytes(input, INPUT_SIZE); // read in input
     input[size] = 0; // clear array after read
     char* command = strtok(input, " "); // returns pointer to beginning of token
+    //chronoi2c.stop();
+    //Serial.println(chronoi2c.elapsed());
 
     while (command != 0){
-      chronoi2c.restart(0);
       // split command into a, b and c
       char* RTP_mode = strchr(command, 'r'); // returns pointer to location of instance
       char* INTTRIG_mode = strchr(command, 'i'); // returns pointer to location of instance
@@ -242,9 +244,6 @@ void loop() {
         }
         new_data = 1;
       }
-
-      chronoi2c.stop();
-      Serial.println(chronoi2c.elapsed());
 
       if (RTP_mode != 0){
         *RTP_mode = 0;
