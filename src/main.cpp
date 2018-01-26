@@ -26,7 +26,7 @@ int MOT8_EN = 48;
 int previous_waveform = 16;
 
 // serial
-#define INPUT_SIZE 4
+#define INPUT_SIZE 5
 int new_data = 0;
 bool debug_mode = false;
 
@@ -179,6 +179,10 @@ void setup() {
 }
 
 int i = 0;
+int RTP_val = 0;
+int enableSelection = 0;
+int TRIGGER_DRV = 0;
+int INTTRIG_val = 0;
 
 void loop() {
 
@@ -190,6 +194,10 @@ void loop() {
     byte size = Serial.readBytes(input, INPUT_SIZE); // read in input
     input[size] = 0; // clear array after read
     char* command = strtok(input, " "); // returns pointer to beginning of token
+    if(debug_mode){
+      Serial.print("Raw serial: "); Serial.println(command);
+    }
+
 
     while (command != 0){
       // split command into a, b and c
@@ -213,8 +221,7 @@ void loop() {
       if (ENABLE_selection != 0){
         *ENABLE_selection = 0;
         ++ENABLE_selection;
-        int enableSelection = atoi(ENABLE_selection);
-        tcaselect(enableSelection);
+        enableSelection = atoi(ENABLE_selection);
         if(debug_mode){
           Serial.print("DRV selected: "); Serial.println(enableSelection, DEC);
         }
@@ -226,20 +233,17 @@ void loop() {
       if (TRIGGER_selection != 0){
         *TRIGGER_selection = 0;
         ++TRIGGER_selection;
-        int TRIGGER_DRV = atoi(TRIGGER_selection);
-        //tcaselect(TRIGGER_DRV);
-        //drv.setMode(DRV2605_MODE_INTTRIG);
+        //TRIGGER_DRV = atoi(TRIGGER_selection);
         drv.go();
         if(debug_mode){
-          Serial.print("DRV triggered: "); Serial.println(TRIGGER_DRV, DEC);
+          Serial.println("DRV triggered!"); // Serial.println(TRIGGER_DRV, DEC);
         }
         new_data = 1;
       }
 
       if (RTP_mode != 0){
         *RTP_mode = 0;
-        ++RTP_mode;
-        int RTP_val = atoi(RTP_mode);
+        //++RTP_mode;
         enableRTP();
         if(debug_mode){
           Serial.println("RTP mode enabled.");
@@ -250,8 +254,7 @@ void loop() {
       if (RTP_transmit != 0){
         *RTP_transmit = 0;
         ++RTP_transmit;
-        int RTP_val = atoi(RTP_transmit);
-        sendRTP(RTP_val);
+        RTP_val = atoi(RTP_transmit);
         if(debug_mode){
           Serial.print("DRV RTP: "); Serial.println(RTP_val, DEC);
         }
@@ -261,25 +264,40 @@ void loop() {
       if (INTTRIG_mode != 0){
         *INTTRIG_mode = 0;
         ++INTTRIG_mode;
-        int INTTRIG_val = atoi(INTTRIG_mode); // not used yet
-        if(INTTRIG_val == 0){
-          INTTRIG_val = previous_waveform; // if no value entered, default
-        }
-        drv.setMode(DRV2605_MODE_INTTRIG);
-        drv.setWaveform(0, INTTRIG_val);  // play effect
-        drv.setWaveform(1, 0);       // end waveform
+        INTTRIG_val = atoi(INTTRIG_mode); // issue is here!
+        // if(INTTRIG_val == 0){
+        //   INTTRIG_val = previous_waveform; // if no value entered, default
+        // }
         if(debug_mode){
           Serial.print("Waveform trigger "); Serial.print(INTTRIG_val, DEC); Serial.println(" set on current DRV.");
         }
         new_data = 1;
-        previous_waveform = INTTRIG_val;
+        //previous_waveform = INTTRIG_val;
       }
-
       command = strtok(0, " "); // split command based on the space
     }
   }
 
   if(new_data){
+
+    if(RTP_val >= 0){
+      sendRTP(RTP_val);
+      RTP_val = 0;
+    }
+
+    if(enableSelection > 0){
+      tcaselect(enableSelection);
+      enableSelection = 0;
+    }
+
+    if(INTTRIG_val > 0){
+      drv.setMode(DRV2605_MODE_INTTRIG);
+      drv.setWaveform(0, INTTRIG_val);  // play effect
+      drv.setWaveform(1, 0);       // end waveform
+      INTTRIG_val = 0;
+    }
+
+
     new_data = 0;
   }
 
