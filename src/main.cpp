@@ -26,7 +26,7 @@ int MOT8_EN = 48;
 int previous_waveform = 16;
 
 // serial
-#define INPUT_SIZE 5
+#define INPUT_SIZE 4
 int new_data = 0;
 bool debug_mode = false;
 
@@ -157,11 +157,12 @@ void runDiagnostics(){
 // Audio-to-vibe
 
 // software timers
-//Chrono chronoi2c(Chrono::MICROS);
+Chrono chronoi2c(Chrono::MICROS);
 
 void setup() {
 
-  Serial.begin(9600);
+  Serial.begin(9600, SERIAL_8E1);
+  Serial.setTimeout(2);
   Serial.println("Haptic Shield v0.1b");
 
   initDRV();
@@ -171,7 +172,7 @@ void setup() {
   tcaenableall();
   delay(250);
   drv.begin();
-  drv.selectLibrary(6);
+  drv.selectLibrary(2);
   drv.setMode(DRV2605_MODE_INTTRIG);
   drv.useERM();
   drv.setWaveform(0, previous_waveform);  // play effect
@@ -179,25 +180,35 @@ void setup() {
 }
 
 int i = 0;
+int trig = 0;
 int RTP_val = 0;
 int enableSelection = 0;
 int TRIGGER_DRV = 0;
 int INTTRIG_val = 0;
+//char input[INPUT_SIZE + 1]; // create array for incoming serial data of set size
 
 void loop() {
 
   // choose between RTP or INTTRIG
 
   // wait for incoming command
-  if(Serial.available()){
+  if(Serial.available() > 0){
+
     char input[INPUT_SIZE + 1]; // create array for incoming serial data of set size
-    byte size = Serial.readBytes(input, INPUT_SIZE); // read in input
+
+    chronoi2c.restart();
+
+    byte size = Serial.readBytes(input, INPUT_SIZE); // THIS NEEDS REPLACING WITH SERIAL.READ()
+
+    chronoi2c.stop();
+    long currentTime = chronoi2c.elapsed();
+    Serial.print("Time used: "); Serial.println(currentTime);
+
     input[size] = 0; // clear array after read
     char* command = strtok(input, " "); // returns pointer to beginning of token
     if(debug_mode){
       Serial.print("Raw serial: "); Serial.println(command);
     }
-
 
     while (command != 0){
       // split command into a, b and c
@@ -209,6 +220,19 @@ void loop() {
       char* TRIGGER_selection = strchr(command, 't'); // returns pointer to location of instance
 
       // pick mode
+      if (TRIGGER_selection != 0){
+        *TRIGGER_selection = 0;
+        ++TRIGGER_selection;
+        TRIGGER_DRV = atoi(TRIGGER_selection);
+        drv.go();
+        if(debug_mode){
+          Serial.println("DRV triggered!"); // Serial.println(TRIGGER_DRV, DEC);
+        }
+        Serial.flush();
+        //trig = 1; // set trigger flag ready for end of loop
+        //new_data = 1;
+      }
+
       if (DEBUG_mode != 0){
         *DEBUG_mode = 0;
         ++DEBUG_mode;
@@ -222,28 +246,16 @@ void loop() {
         *ENABLE_selection = 0;
         ++ENABLE_selection;
         enableSelection = atoi(ENABLE_selection);
+        tcaselect(enableSelection);
         if(debug_mode){
           Serial.print("DRV selected: "); Serial.println(enableSelection, DEC);
         }
         new_data = 1;
       }
 
-
-
-      if (TRIGGER_selection != 0){
-        *TRIGGER_selection = 0;
-        ++TRIGGER_selection;
-        //TRIGGER_DRV = atoi(TRIGGER_selection);
-        drv.go();
-        if(debug_mode){
-          Serial.println("DRV triggered!"); // Serial.println(TRIGGER_DRV, DEC);
-        }
-        new_data = 1;
-      }
-
       if (RTP_mode != 0){
         *RTP_mode = 0;
-        //++RTP_mode;
+        ++RTP_mode;
         enableRTP();
         if(debug_mode){
           Serial.println("RTP mode enabled.");
@@ -265,15 +277,12 @@ void loop() {
         *INTTRIG_mode = 0;
         ++INTTRIG_mode;
         INTTRIG_val = atoi(INTTRIG_mode); // issue is here!
-        // if(INTTRIG_val == 0){
-        //   INTTRIG_val = previous_waveform; // if no value entered, default
-        // }
         if(debug_mode){
           Serial.print("Waveform trigger "); Serial.print(INTTRIG_val, DEC); Serial.println(" set on current DRV.");
         }
         new_data = 1;
-        //previous_waveform = INTTRIG_val;
       }
+
       command = strtok(0, " "); // split command based on the space
     }
   }
@@ -285,18 +294,16 @@ void loop() {
       RTP_val = 0;
     }
 
-    if(enableSelection > 0){
-      tcaselect(enableSelection);
-      enableSelection = 0;
-    }
-
     if(INTTRIG_val > 0){
       drv.setMode(DRV2605_MODE_INTTRIG);
       drv.setWaveform(0, INTTRIG_val);  // play effect
       drv.setWaveform(1, 0);       // end waveform
       INTTRIG_val = 0;
     }
-
+    // if(trig){
+    //   drv.go();
+    //   trig = 0;
+    // }
 
     new_data = 0;
   }
