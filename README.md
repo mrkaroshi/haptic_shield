@@ -1,4 +1,6 @@
-Haptic Shield cheatsheet:
+This hardware and software is provided under the MIT License.
+
+Haptic Shield Firmware cheatsheet:
 
 'd' - debug mode, will print out all changes
 
